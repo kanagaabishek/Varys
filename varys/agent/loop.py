@@ -106,21 +106,32 @@ class VarysAgent:
             discovered_tools: List[DiscoveredTool] = await session.list_tools()
             func_decls = [t.to_gemini_declaration() for t in discovered_tools]
 
-            config = types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                tools=[{"function_declarations": func_decls}],
-                temperature=0.1,
-            )
-
             # Initial user prompt
-            user_content = types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=query)],
+            conversation_history.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=query)],
+                )
             )
-            conversation_history.append(user_content)
 
             final_text = ""
             for turn in range(1, self.max_turns + 1):
+                # Mandate tool execution on turn 1 (or whenever no steps have been executed yet)
+                mode = (
+                    types.FunctionCallingConfigMode.ANY
+                    if len(steps) == 0
+                    else types.FunctionCallingConfigMode.AUTO
+                )
+
+                config = types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    tools=[{"function_declarations": func_decls}],
+                    tool_config=types.ToolConfig(
+                        function_calling_config=types.FunctionCallingConfig(mode=mode)
+                    ),
+                    temperature=0.1,
+                )
+
                 try:
                     response = self._call_gemini_safe(
                         ai_client=ai_client,
@@ -142,20 +153,6 @@ class VarysAgent:
                         function_calls.append(part.function_call)
 
                 if not function_calls:
-                    # If model didn't call tools on turn 1, force it to start with get_recent_builds
-                    if turn == 1 and len(steps) == 0:
-                        conversation_history.append(
-                            types.Content(
-                                role="user",
-                                parts=[
-                                    types.Part.from_text(
-                                        text="Please begin the investigation by invoking get_recent_builds to inspect the pipeline build history."
-                                    )
-                                ],
-                            )
-                        )
-                        continue
-
                     # Model produced final diagnosis text
                     final_text = response.text or ""
                     break

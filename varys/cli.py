@@ -51,17 +51,53 @@ def render_step(step: AgentStep) -> None:
     console.print(f"  ├── ⚙️ [bold blue]Step {step.step_number}:[/] [italic]{step.thought}[/]")
     console.print(f"  │   └── 📞 [cyan]MCP Call:[/] [bold]{step.tool_name}[/]({tool_args_str})")
 
-    # Format result snippet
+    # Format domain-specific result snippet
     if step.tool_result is not None:
         if isinstance(step.tool_result, list):
-            res_summary = f"{len(step.tool_result)} items returned"
-            if len(step.tool_result) > 0 and isinstance(step.tool_result[0], dict):
-                first_keys = list(step.tool_result[0].keys())[:3]
-                res_summary += f" (sample keys: {first_keys})"
+            items = step.tool_result
+            if step.tool_name == "get_recent_builds":
+                failed = [
+                    b.get("build_number") for b in items
+                    if isinstance(b, dict) and (b.get("result") in ("FAILURE", "UNSTABLE") or b.get("status") in ("FAILURE", "UNSTABLE"))
+                ]
+                durations = [
+                    f"#{b.get('build_number')}:{b.get('duration_sec', b.get('duration', 0))}s"
+                    for b in items[:3] if isinstance(b, dict)
+                ]
+                if failed:
+                    res_summary = f"{len(items)} builds analyzed | [bold red]Failed builds:[/] {failed[:5]}"
+                else:
+                    res_summary = f"{len(items)} builds analyzed (all PASSED) | Recent durations: {', '.join(durations)}"
+            elif step.tool_name == "get_test_results":
+                failed = [t for t in items if isinstance(t, dict) and t.get("status") == "FAILED"]
+                if failed:
+                    res_summary = f"Found [bold red]{len(failed)} failed test(s)[/]: " + ", ".join(
+                        f"[bold]{t.get('test_name')}[/]" for t in failed
+                    )
+                else:
+                    res_summary = f"All {len(items)} tests [bold green]PASSED[/]"
+            elif step.tool_name == "get_test_history":
+                passed = sum(1 for t in items if isinstance(t, dict) and t.get("status") == "PASSED")
+                failed = sum(1 for t in items if isinstance(t, dict) and t.get("status") == "FAILED")
+                res_summary = f"{len(items)} runs: [green]{passed} PASSED[/], [red]{failed} FAILED[/]"
+                if passed > 0 and failed > 0:
+                    res_summary += " [bold yellow](Intermittent / Flaky pattern detected)[/]"
+            elif step.tool_name == "get_commits_between":
+                commits_info = [
+                    f"[yellow]{c.get('commit_hash')}[/] by {c.get('author')}: \"{c.get('message', '')[:40]}\""
+                    for c in items if isinstance(c, dict)
+                ]
+                res_summary = f"{len(items)} commit(s) found -> " + "; ".join(commits_info)
+            else:
+                res_summary = f"{len(items)} items returned"
         elif isinstance(step.tool_result, dict):
-            res_summary = f"{list(step.tool_result.keys())}"
+            if "error" in step.tool_result:
+                res_summary = f"[bold red]Error:[/] {step.tool_result['error']}"
+            else:
+                res_summary = f"{list(step.tool_result.keys())}"
         else:
-            res_summary = str(step.tool_result)[:80]
+            res_summary = str(step.tool_result)[:100]
+
         console.print(f"  │   └── 📊 [green]Result:[/] {res_summary}")
     console.print("  │")
 
