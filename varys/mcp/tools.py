@@ -96,20 +96,30 @@ def get_commits_between(
     end_build: Optional[int] = None,
     old_build_number: Optional[int] = None,
     new_build_number: Optional[int] = None,
+    from_build_number: Optional[int] = None,
+    to_build_number: Optional[int] = None,
+    from_build: Optional[int] = None,
+    to_build: Optional[int] = None,
+    build_number_1: Optional[int] = None,
+    build_number_2: Optional[int] = None,
     build_a: Optional[int] = None,
     build_b: Optional[int] = None,
     db: Optional[VarysDatabase] = None,
     db_path: str = "varys.db",
+    **kwargs: Any,
 ) -> List[dict[str, Any]]:
     """Fetches git commit metadata and changed file lists between two build numbers."""
-    sb = start_build if start_build is not None else (old_build_number if old_build_number is not None else build_a)
-    eb = end_build if end_build is not None else (new_build_number if new_build_number is not None else build_b)
+    candidates_start = [start_build, old_build_number, from_build_number, from_build, build_number_1, build_a, kwargs.get("start"), kwargs.get("from")]
+    candidates_end = [end_build, new_build_number, to_build_number, to_build, build_number_2, build_b, kwargs.get("end"), kwargs.get("to")]
+
+    sb = next((x for x in candidates_start if x is not None), None)
+    eb = next((x for x in candidates_end if x is not None), None)
 
     if sb is None or eb is None:
-        raise ValueError("Both start_build and end_build (or aliases old_build_number/new_build_number) are required.")
+        raise ValueError("Both start_build and end_build (or aliases) are required.")
 
     database = db or get_db(db_path)
     raw = database.get_commits_between(
-        job_name=job_name, start_build=sb, end_build=eb
+        job_name=job_name, start_build=int(sb), end_build=int(eb)
     )
     return [CommitItem(**r).model_dump() for r in raw]

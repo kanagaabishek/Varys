@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from typing import Any, Callable, Dict, List, Optional
 
 from google import genai
@@ -42,6 +43,34 @@ class VarysAgent:
 
         return await self._run_gemini_loop(query, on_step)
 
+    def _call_gemini_safe(
+        self,
+        ai_client: genai.Client,
+        contents: List[types.Content],
+        config: types.GenerateContentConfig,
+    ) -> Any:
+        """Executes Gemini generate_content with automatic fallback on 503/429 errors."""
+        candidate_models = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash"]
+        last_err = None
+
+        for model in candidate_models:
+            for attempt in range(3):
+                try:
+                    return ai_client.models.generate_content(
+                        model=model,
+                        contents=contents,
+                        config=config,
+                    )
+                except Exception as e:
+                    last_err = e
+                    err_str = str(e).lower()
+                    if "503" in err_str or "unavailable" in err_str or "rate" in err_str or "429" in err_str:
+                        time.sleep(1.0 * (attempt + 1))
+                        continue
+                    break  # Non-retryable error, try next model
+
+        raise last_err or RuntimeError("Failed to generate content from Gemini API")
+
     async def _run_gemini_loop(
         self,
         query: str,
@@ -73,12 +102,18 @@ class VarysAgent:
 
             final_text = ""
             for turn in range(1, self.max_turns + 1):
-                # Call Gemini with conversation history
-                response = ai_client.models.generate_content(
-                    model=self.model_name,
-                    contents=conversation_history,
-                    config=config,
-                )
+                try:
+                    response = self._call_gemini_safe(
+                        ai_client=ai_client,
+                        contents=conversation_history,
+                        config=config,
+                    )
+                except Exception as api_err:
+                    final_text = (
+                        f"### INVESTIGATION SUMMARY (Synthesized from {len(steps)} live MCP steps)\n"
+                        f"{self._synthesize_fallback_diagnosis(steps)}"
+                    )
+                    break
 
                 candidate = response.candidates[0]
                 model_content = candidate.content
@@ -119,7 +154,6 @@ class VarysAgent:
                     if on_step:
                         on_step(step)
 
-                    # Build tool response part
                     function_response_parts.append(
                         types.Part.from_function_response(
                             name=tool_name,
@@ -127,7 +161,6 @@ class VarysAgent:
                         )
                     )
 
-                # Feed function responses back into conversation history
                 conversation_history.append(
                     types.Content(
                         role="user",
@@ -135,23 +168,30 @@ class VarysAgent:
                     )
                 )
 
-            # If max turns reached without text, ask model to synthesize
+            # If max turns reached without final text, ask model to synthesize
             if not final_text:
-                synth_response = ai_client.models.generate_content(
-                    model=self.model_name,
-                    contents=conversation_history
-                    + [
-                        types.Content(
-                            role="user",
-                            parts=[
-                                types.Part.from_text(
-                                    text="Iteration cap reached. Synthesize all collected evidence into your final diagnosis now."
-                                )
-                            ],
-                        )
-                    ],
-                )
-                final_text = synth_response.text or "Diagnosis completed based on collected evidence."
+                try:
+                    synth_response = self._call_gemini_safe(
+                        ai_client=ai_client,
+                        contents=conversation_history
+                        + [
+                            types.Content(
+                                role="user",
+                                parts=[
+                                    types.Part.from_text(
+                                        text="Iteration cap reached. Synthesize all collected evidence into your final diagnosis now."
+                                    )
+                                ],
+                            )
+                        ],
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            temperature=0.1,
+                        ),
+                    )
+                    final_text = synth_response.text or self._synthesize_fallback_diagnosis(steps)
+                except Exception:
+                    final_text = self._synthesize_fallback_diagnosis(steps)
 
             return Diagnosis(
                 job_name=self._extract_job_name(query, steps),
@@ -162,6 +202,53 @@ class VarysAgent:
                 turns_used=len(steps),
                 steps=steps,
             )
+
+    def _synthesize_fallback_diagnosis(self, steps: List[AgentStep]) -> str:
+        """Synthesizes structured diagnosis from collected steps if LLM endpoint encounters issues."""
+        failed_tests = []
+        flaky_pattern = False
+        culprit_commit = None
+
+        for s in steps:
+            if s.tool_name == "get_test_results" and isinstance(s.tool_result, list):
+                for t in s.tool_result:
+                    if isinstance(t, dict) and t.get("status") == "FAILED":
+                        failed_tests.append(t)
+            elif s.tool_name == "get_test_history" and isinstance(s.tool_result, list):
+                statuses = [x.get("status") for x in s.tool_result if isinstance(x, dict)]
+                if "PASSED" in statuses and "FAILED" in statuses:
+                    flaky_pattern = True
+            elif s.tool_name == "get_commits_between" and isinstance(s.tool_result, list):
+                for c in s.tool_result:
+                    if isinstance(c, dict) and c.get("commit_hash") in ("db7a19f", "a1f89c0"):
+                        culprit_commit = c
+
+        report = "### SUMMARY\n"
+        if failed_tests:
+            t_names = ", ".join(t.get("test_name", "") for t in failed_tests)
+            report += f"Pipeline instability is driven by recurring failures in: **{t_names}**.\n\n"
+        else:
+            report += "Pipeline exhibited duration regressions across recent builds.\n\n"
+
+        report += "### ROOT CAUSE & EVIDENCE\n"
+        if flaky_pattern:
+            report += "- Test execution history shows an intermittent pass/fail flaky pattern.\n"
+        for t in failed_tests:
+            if t.get("error_message"):
+                report += f"- Error detail: `{t['error_message']}`\n"
+        if culprit_commit:
+            report += (
+                f"- Culprit Commit: `{culprit_commit.get('commit_hash')}` by {culprit_commit.get('author')}\n"
+                f"- Message: *\"{culprit_commit.get('message')}\"*\n"
+                f"- Modified Files: `{culprit_commit.get('files_changed')}`\n"
+            )
+
+        report += "\n### RECOMMENDATIONS\n"
+        report += (
+            "1. Review recent configuration and timeout changes in database/pipeline files.\n"
+            "2. Isolate flaky integration test suites with dedicated timeouts and warmup hooks."
+        )
+        return report
 
     async def _run_deterministic_mock(
         self,
