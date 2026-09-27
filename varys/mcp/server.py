@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any, List, Optional
 
-from mcp.server import MCPServer
-
-mcp = MCPServer("varys-jenkins-diagnostics")
+try:
+    from mcp.server.mcpserver import MCPServer
+    mcp = MCPServer("varys-jenkins-diagnostics")
+except (ImportError, ModuleNotFoundError):
+    from mcp.server.fastmcp import FastMCP
+    mcp = FastMCP("varys-jenkins-diagnostics")
 
 from varys.mcp.tools import (
     get_commits_between as _get_commits_between,
@@ -39,10 +42,24 @@ def get_test_history(job_name: str, test_name: str, count: int = 15) -> List[dic
 
 @mcp.tool()
 def get_commits_between(
-    job_name: str, start_build: int, end_build: int
+    job_name: str,
+    start_build: Optional[int] = None,
+    end_build: Optional[int] = None,
+    old_build_number: Optional[int] = None,
+    new_build_number: Optional[int] = None,
+    build_a: Optional[int] = None,
+    build_b: Optional[int] = None,
 ) -> List[dict[str, Any]]:
     """Fetches git commit metadata and changed file lists between two build numbers."""
-    return _get_commits_between(job_name=job_name, start_build=start_build, end_build=end_build)
+    return _get_commits_between(
+        job_name=job_name,
+        start_build=start_build,
+        end_build=end_build,
+        old_build_number=old_build_number,
+        new_build_number=new_build_number,
+        build_a=build_a,
+        build_b=build_b,
+    )
 
 
 def main() -> None:

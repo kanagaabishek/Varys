@@ -92,14 +92,24 @@ def get_test_history(
 
 def get_commits_between(
     job_name: str,
-    start_build: int,
-    end_build: int,
+    start_build: Optional[int] = None,
+    end_build: Optional[int] = None,
+    old_build_number: Optional[int] = None,
+    new_build_number: Optional[int] = None,
+    build_a: Optional[int] = None,
+    build_b: Optional[int] = None,
     db: Optional[VarysDatabase] = None,
     db_path: str = "varys.db",
 ) -> List[dict[str, Any]]:
     """Fetches git commit metadata and changed file lists between two build numbers."""
+    sb = start_build if start_build is not None else (old_build_number if old_build_number is not None else build_a)
+    eb = end_build if end_build is not None else (new_build_number if new_build_number is not None else build_b)
+
+    if sb is None or eb is None:
+        raise ValueError("Both start_build and end_build (or aliases old_build_number/new_build_number) are required.")
+
     database = db or get_db(db_path)
     raw = database.get_commits_between(
-        job_name=job_name, start_build=start_build, end_build=end_build
+        job_name=job_name, start_build=sb, end_build=eb
     )
     return [CommitItem(**r).model_dump() for r in raw]
