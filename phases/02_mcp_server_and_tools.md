@@ -97,10 +97,10 @@ varys/mcp/
 
 ## 4. Implementation Tasks
 
-- [ ] **Task 2.1**: Implement `varys/mcp/tools.py` with typed Pydantic models for inputs and outputs.
-- [ ] **Task 2.2**: Integrate tools with `varys/storage/database.py` DAO.
-- [ ] **Task 2.3**: Implement `varys/mcp/server.py` exposing the tools via FastMCP.
-- [ ] **Task 2.4**: Implement tool invocation unit tests in `tests/test_mcp_tools.py` verifying response schema and error handling when invalid job or build IDs are passed.
+- [x] **Task 2.1**: Implement `varys/mcp/tools.py` with typed Pydantic models for inputs and outputs.
+- [x] **Task 2.2**: Integrate tools with `varys/storage/database.py` DAO.
+- [x] **Task 2.3**: Implement `varys/mcp/server.py` exposing the tools via FastMCP.
+- [x] **Task 2.4**: Implement tool invocation unit tests in `tests/test_mcp_tools.py` verifying response schema and error handling when invalid job or build IDs are passed.
 
 ---
 

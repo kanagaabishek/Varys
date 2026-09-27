@@ -41,6 +41,7 @@ class BuildRecord:
 
 @dataclass
 class TestResultRecord:
+    __test__ = False
     id: Optional[int]
     job_name: str
     build_number: int
