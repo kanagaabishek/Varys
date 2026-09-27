@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, List
+from mcp.server import MCPServer
 
-try:
-    from mcp.server.mcpserver import MCPServer
-    mcp = MCPServer("varys-jenkins-diagnostics")
-except (ImportError, ModuleNotFoundError):
-    from mcp.server.fastmcp import FastMCP
-    mcp = FastMCP("varys-jenkins-diagnostics")
+# Initialize MCP Server
+mcp = MCPServer("varys-jenkins-diagnostics")
 
 from varys.mcp.tools import (
     get_commits_between as _get_commits_between,
@@ -24,53 +21,54 @@ def get_recent_builds(job_name: str, count: int = 15) -> List[dict[str, Any]]:
     """Retrieves summary metadata (build number, result status, duration in seconds, timestamp, commit hash)
 
     of the most recent N builds for a given Jenkins job.
+
+    Args:
+        job_name: Name of the Jenkins pipeline (e.g. 'payment-pipeline' or 'order-service-build').
+        count: Number of recent builds to retrieve (default: 15).
     """
     return _get_recent_builds(job_name=job_name, count=count)
 
 
 @mcp.tool()
 def get_test_results(job_name: str, build_number: int) -> List[dict[str, Any]]:
-    """Returns execution details and error traces for all test cases run in a specific build."""
+    """Returns execution details and error traces for all test cases run in a specific build.
+
+    Args:
+        job_name: Name of the Jenkins pipeline (e.g. 'payment-pipeline').
+        build_number: The build number to inspect (e.g. 230).
+    """
     return _get_test_results(job_name=job_name, build_number=build_number)
 
 
 @mcp.tool()
 def get_test_history(job_name: str, test_name: str, count: int = 15) -> List[dict[str, Any]]:
-    """Traces the pass/fail/skipped timeline of a single test across previous builds to diagnose flakiness or permanent breakage."""
+    """Traces the pass/fail/skipped timeline of a single test across previous builds to diagnose flakiness or permanent breakage.
+
+    Args:
+        job_name: Name of the Jenkins pipeline (e.g. 'payment-pipeline').
+        test_name: Name of the test class/method (e.g. 'DatabaseConnectionTest').
+        count: Number of past builds to check (default: 15).
+    """
     return _get_test_history(job_name=job_name, test_name=test_name, count=count)
 
 
 @mcp.tool()
 def get_commits_between(
     job_name: str,
-    start_build: Optional[int] = None,
-    end_build: Optional[int] = None,
-    old_build_number: Optional[int] = None,
-    new_build_number: Optional[int] = None,
-    from_build_number: Optional[int] = None,
-    to_build_number: Optional[int] = None,
-    from_build: Optional[int] = None,
-    to_build: Optional[int] = None,
-    build_number_1: Optional[int] = None,
-    build_number_2: Optional[int] = None,
-    build_a: Optional[int] = None,
-    build_b: Optional[int] = None,
+    start_build: int,
+    end_build: int,
 ) -> List[dict[str, Any]]:
-    """Fetches git commit metadata and changed file lists between two build numbers."""
+    """Fetches git commit metadata and changed file lists between two build numbers (inclusive).
+
+    Args:
+        job_name: Name of the Jenkins pipeline (e.g. 'payment-pipeline' or 'order-service-build').
+        start_build: The earlier healthy baseline build number (e.g. 215).
+        end_build: The later failing or slow build number (e.g. 217).
+    """
     return _get_commits_between(
         job_name=job_name,
         start_build=start_build,
         end_build=end_build,
-        old_build_number=old_build_number,
-        new_build_number=new_build_number,
-        from_build_number=from_build_number,
-        to_build_number=to_build_number,
-        from_build=from_build,
-        to_build=to_build,
-        build_number_1=build_number_1,
-        build_number_2=build_number_2,
-        build_a=build_a,
-        build_b=build_b,
     )
 
 

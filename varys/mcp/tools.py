@@ -92,34 +92,20 @@ def get_test_history(
 
 def get_commits_between(
     job_name: str,
-    start_build: Optional[int] = None,
-    end_build: Optional[int] = None,
-    old_build_number: Optional[int] = None,
-    new_build_number: Optional[int] = None,
-    from_build_number: Optional[int] = None,
-    to_build_number: Optional[int] = None,
-    from_build: Optional[int] = None,
-    to_build: Optional[int] = None,
-    build_number_1: Optional[int] = None,
-    build_number_2: Optional[int] = None,
-    build_a: Optional[int] = None,
-    build_b: Optional[int] = None,
+    start_build: int,
+    end_build: int,
     db: Optional[VarysDatabase] = None,
     db_path: str = "varys.db",
-    **kwargs: Any,
 ) -> List[dict[str, Any]]:
-    """Fetches git commit metadata and changed file lists between two build numbers."""
-    candidates_start = [start_build, old_build_number, from_build_number, from_build, build_number_1, build_a, kwargs.get("start"), kwargs.get("from")]
-    candidates_end = [end_build, new_build_number, to_build_number, to_build, build_number_2, build_b, kwargs.get("end"), kwargs.get("to")]
+    """Fetches git commit metadata and changed file lists between two build numbers (inclusive).
 
-    sb = next((x for x in candidates_start if x is not None), None)
-    eb = next((x for x in candidates_end if x is not None), None)
-
-    if sb is None or eb is None:
-        raise ValueError("Both start_build and end_build (or aliases) are required.")
-
+    Args:
+        job_name: Name of the Jenkins pipeline (e.g. 'payment-pipeline' or 'order-service-build').
+        start_build: The earlier healthy baseline build number (e.g. 215).
+        end_build: The later failing or slow build number (e.g. 217).
+    """
     database = db or get_db(db_path)
     raw = database.get_commits_between(
-        job_name=job_name, start_build=int(sb), end_build=int(eb)
+        job_name=job_name, start_build=start_build, end_build=end_build
     )
     return [CommitItem(**r).model_dump() for r in raw]

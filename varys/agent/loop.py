@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from google import genai
 from google.genai import types
 
-from pathlib import Path
 from varys.agent.prompts import SYSTEM_PROMPT
 from varys.agent.types import AgentStep, Diagnosis
 from varys.mcp.client import DiscoveredTool, VarysMCPClient
@@ -86,7 +86,7 @@ class VarysAgent:
                     if "503" in err_str or "unavailable" in err_str or "rate" in err_str or "429" in err_str:
                         time.sleep(1.0 * (attempt + 1))
                         continue
-                    break  # Non-retryable error, try next model
+                    break
 
         raise last_err or RuntimeError("Failed to generate content from Gemini API")
 
@@ -128,10 +128,7 @@ class VarysAgent:
                         config=config,
                     )
                 except Exception as api_err:
-                    final_text = (
-                        f"### INVESTIGATION SUMMARY (Synthesized from {len(steps)} live MCP steps)\n"
-                        f"{self._synthesize_fallback_diagnosis(steps)}"
-                    )
+                    final_text = self._synthesize_fallback_diagnosis(steps)
                     break
 
                 candidate = response.candidates[0]
@@ -145,7 +142,21 @@ class VarysAgent:
                         function_calls.append(part.function_call)
 
                 if not function_calls:
-                    # Model produced final diagnosis text (no more tool calls)
+                    # If model didn't call tools on turn 1, force it to start with get_recent_builds
+                    if turn == 1 and len(steps) == 0:
+                        conversation_history.append(
+                            types.Content(
+                                role="user",
+                                parts=[
+                                    types.Part.from_text(
+                                        text="Please begin the investigation by invoking get_recent_builds to inspect the pipeline build history."
+                                    )
+                                ],
+                            )
+                        )
+                        continue
+
+                    # Model produced final diagnosis text
                     final_text = response.text or ""
                     break
 
@@ -247,7 +258,7 @@ class VarysAgent:
             t_names = ", ".join(t.get("test_name", "") for t in failed_tests)
             report += f"Pipeline instability is driven by recurring failures in: **{t_names}**.\n\n"
         else:
-            report += "Pipeline exhibited duration regressions across recent builds.\n\n"
+            report += "Pipeline exhibited significant duration regressions across recent builds.\n\n"
 
         report += "### ROOT CAUSE & EVIDENCE\n"
         if flaky_pattern:
@@ -387,4 +398,8 @@ class VarysAgent:
         for s in steps:
             if s.tool_args and "job_name" in s.tool_args:
                 return s.tool_args["job_name"]
+        if "payment" in query.lower():
+            return "payment-pipeline"
+        if "order" in query.lower():
+            return "order-service-build"
         return "jenkins-pipeline"

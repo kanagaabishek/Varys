@@ -67,7 +67,7 @@ class VarysMCPClientSession:
         result = await self._session.list_tools()
         tools = []
         for t in result.tools:
-            schema = t.inputSchema if hasattr(t, "inputSchema") and t.inputSchema else {}
+            schema = getattr(t, "input_schema", getattr(t, "inputSchema", {})) or {}
             tools.append(
                 DiscoveredTool(
                     name=t.name,
