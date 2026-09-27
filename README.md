@@ -10,16 +10,16 @@
 
 ---
 
-## 📑 Table of Contents
-1. [Executive Summary & Problem Statement](#-1-executive-summary--problem-statement)
-2. [System Architecture](#-2-system-architecture)
-3. [Key Engineering Decisions & Trade-Offs](#-3-key-engineering-decisions--trade-offs)
-4. [Mathematical Heuristics (Flakiness & Regression)](#-4-mathematical-heuristics)
-5. [Quickstart & Live Execution](#-5-quickstart--live-execution)
-6. [Real-World Jenkins & GitHub Integration](#-6-real-world-jenkins--github-integration)
-7. [Deterministic Scenarios & Benchmark Suite](#-7-deterministic-scenarios--benchmark-suite)
-8. [Production Reliability & Guardrails](#-8-production-reliability--guardrails)
-9. [Technical Interview Defense Guide](#-9-technical-interview-defense-guide)
+## Table of Contents
+1. [Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
+2. [System Architecture](#2-system-architecture)
+3. [Key Engineering Decisions & Trade-Offs](#3-key-engineering-decisions--trade-offs)
+4. [Mathematical Heuristics](#4-mathematical-heuristics)
+5. [Quickstart & Live Execution](#5-quickstart--live-execution)
+6. [Real-World Jenkins & GitHub Integration](#6-real-world-jenkins--github-integration)
+7. [Deterministic Scenarios & Benchmark Suite](#7-deterministic-scenarios--benchmark-suite)
+8. [Production Reliability & Guardrails](#8-production-reliability--guardrails)
+9. [Authors & Contributors](#authors--contributors)
 
 ---
 
