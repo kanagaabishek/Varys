@@ -4,19 +4,9 @@ from __future__ import annotations
 
 from typing import Any, List
 
-try:
-    from mcp.server import MCPServer
-    server = MCPServer("varys-jenkins-diagnostics")
-except (ImportError, ModuleNotFoundError):
-    try:
-        from mcp.server.fastmcp import FastMCP
-        server = FastMCP("varys-jenkins-diagnostics")
-    except Exception:
-        from mcp.server.mcpserver import MCPServer
-        server = MCPServer("varys-jenkins-diagnostics")
+from mcp.server import MCPServer
 
-# Alias for compatibility
-mcp = server
+mcp = MCPServer("varys-jenkins-diagnostics")
 
 from varys.mcp.tools import (
     get_commits_between as _get_commits_between,
@@ -26,7 +16,7 @@ from varys.mcp.tools import (
 )
 
 
-@server.tool()
+@mcp.tool()
 def get_recent_builds(job_name: str, count: int = 15) -> List[dict[str, Any]]:
     """Retrieves summary metadata (build number, result status, duration in seconds, timestamp, commit hash)
 
@@ -35,19 +25,19 @@ def get_recent_builds(job_name: str, count: int = 15) -> List[dict[str, Any]]:
     return _get_recent_builds(job_name=job_name, count=count)
 
 
-@server.tool()
+@mcp.tool()
 def get_test_results(job_name: str, build_number: int) -> List[dict[str, Any]]:
     """Returns execution details and error traces for all test cases run in a specific build."""
     return _get_test_results(job_name=job_name, build_number=build_number)
 
 
-@server.tool()
+@mcp.tool()
 def get_test_history(job_name: str, test_name: str, count: int = 15) -> List[dict[str, Any]]:
     """Traces the pass/fail/skipped timeline of a single test across previous builds to diagnose flakiness or permanent breakage."""
     return _get_test_history(job_name=job_name, test_name=test_name, count=count)
 
 
-@server.tool()
+@mcp.tool()
 def get_commits_between(
     job_name: str, start_build: int, end_build: int
 ) -> List[dict[str, Any]]:
@@ -57,7 +47,7 @@ def get_commits_between(
 
 def main() -> None:
     """Runs the MCP server over stdio transport."""
-    server.run()
+    mcp.run()
 
 
 if __name__ == "__main__":

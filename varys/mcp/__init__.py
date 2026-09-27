@@ -1,5 +1,6 @@
 """MCP (Model Context Protocol) tool contracts and server implementation for Varys."""
 
+from varys.mcp.client import DiscoveredTool, VarysMCPClient
 from varys.mcp.tools import (
     BuildSummary,
     CommitItem,
@@ -12,6 +13,8 @@ from varys.mcp.tools import (
 )
 
 __all__ = [
+    "VarysMCPClient",
+    "DiscoveredTool",
     "BuildSummary",
     "TestResultItem",
     "TestHistoryItem",
