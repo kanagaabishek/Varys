@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -36,7 +36,7 @@ class BuildRecord:
     result: str
     duration_sec: float
     timestamp: str
-    commit_hash: str
+    commit_hash: Optional[str] = None
 
 
 @dataclass
@@ -94,7 +94,7 @@ class VarysDatabase:
                     result TEXT CHECK(result IN ('SUCCESS', 'FAILURE', 'UNSTABLE', 'ABORTED')),
                     duration_sec REAL NOT NULL,
                     timestamp TEXT NOT NULL,
-                    commit_hash TEXT NOT NULL,
+                    commit_hash TEXT,
                     FOREIGN KEY(job_name) REFERENCES jobs(name),
                     FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash),
                     UNIQUE(job_name, build_number)
@@ -131,6 +131,16 @@ class VarysDatabase:
                 """
             )
         self.init_schema()
+
+    def validate_job_exists(self, job_name: str) -> None:
+        """Validates that a job exists in the database. Raises ValueError with available jobs on failure."""
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT name FROM jobs WHERE name = ?", (job_name,)).fetchone()
+            if not row:
+                all_jobs = [r["name"] for r in conn.execute("SELECT name FROM jobs ORDER BY name ASC").fetchall()]
+                raise ValueError(
+                    f"Job '{job_name}' not found. Available jobs in system: {all_jobs}"
+                )
 
     # --- Insertion Methods ---
 
@@ -214,6 +224,7 @@ class VarysDatabase:
 
     def get_recent_builds(self, job_name: str, count: int = 15) -> List[dict[str, Any]]:
         """Retrieves recent N builds in descending order (latest first)."""
+        self.validate_job_exists(job_name)
         with self._get_connection() as conn:
             rows = conn.execute(
                 """
@@ -229,6 +240,7 @@ class VarysDatabase:
 
     def get_test_results(self, job_name: str, build_number: int) -> List[dict[str, Any]]:
         """Retrieves test results for a specific build."""
+        self.validate_job_exists(job_name)
         with self._get_connection() as conn:
             rows = conn.execute(
                 """
@@ -243,6 +255,7 @@ class VarysDatabase:
 
     def get_test_history(self, job_name: str, test_name: str, count: int = 15) -> List[dict[str, Any]]:
         """Retrieves timeline of a single test across recent builds (latest first)."""
+        self.validate_job_exists(job_name)
         with self._get_connection() as conn:
             rows = conn.execute(
                 """
@@ -260,6 +273,7 @@ class VarysDatabase:
         self, job_name: str, start_build: int, end_build: int
     ) -> List[dict[str, Any]]:
         """Retrieves commits between two build numbers (inclusive) via JOIN."""
+        self.validate_job_exists(job_name)
         min_b = min(start_build, end_build)
         max_b = max(start_build, end_build)
 

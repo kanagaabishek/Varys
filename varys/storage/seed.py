@@ -8,31 +8,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 
-try:
-    from database import (
-        BuildRecord,
-        CommitRecord,
-        JobRecord,
-        TestResultRecord,
-        VarysDatabase,
-    )
-except (ImportError, ValueError):
-    try:
-        from varys.storage.database import (
-            BuildRecord,
-            CommitRecord,
-            JobRecord,
-            TestResultRecord,
-            VarysDatabase,
-        )
-    except (ImportError, ValueError):
-        from database import (
-            BuildRecord,
-            CommitRecord,
-            JobRecord,
-            TestResultRecord,
-            VarysDatabase,
-        )
+from varys.storage.database import (
+    BuildRecord,
+    CommitRecord,
+    JobRecord,
+    TestResultRecord,
+    VarysDatabase,
+)
 
 
 def seed_scenario_a(db: VarysDatabase) -> None:

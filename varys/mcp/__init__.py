@@ -1,9 +1,8 @@
 """MCP (Model Context Protocol) tool contracts and server implementation for Varys."""
 
-from .tools import (
-    TOOL_DEFINITIONS,
-    CommitItem,
+from varys.mcp.tools import (
     BuildSummary,
+    CommitItem,
     TestHistoryItem,
     TestResultItem,
     get_commits_between,
@@ -21,5 +20,4 @@ __all__ = [
     "get_test_results",
     "get_test_history",
     "get_commits_between",
-    "TOOL_DEFINITIONS",
 ]

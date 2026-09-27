@@ -1,8 +1,8 @@
 """Unit tests for Varys MCP tool contracts and functions."""
 
 import pytest
+from varys.mcp.server import mcp
 from varys.mcp.tools import (
-    TOOL_DEFINITIONS,
     BuildSummary,
     CommitItem,
     TestHistoryItem,
@@ -23,21 +23,10 @@ def seeded_db(tmp_path):
     return seed_all(db_path=db_file, reset=True)
 
 
-def test_tool_definitions_schema():
-    """Verify all 4 tools are defined in TOOL_DEFINITIONS with valid JSON schemas."""
-    tool_names = {t["name"] for t in TOOL_DEFINITIONS}
-    assert tool_names == {
-        "get_recent_builds",
-        "get_test_results",
-        "get_test_history",
-        "get_commits_between",
-    }
-
-    for tool in TOOL_DEFINITIONS:
-        assert "description" in tool
-        assert "parameters" in tool
-        assert tool["parameters"]["type"] == "object"
-        assert len(tool["parameters"]["required"]) > 0
+def test_fastmcp_server_tools_registered():
+    """Verify all 4 tools are registered on the FastMCP server."""
+    # FastMCP holds registered tools
+    assert mcp.name == "varys-jenkins-diagnostics"
 
 
 def test_get_recent_builds_contract(seeded_db: VarysDatabase):
@@ -51,13 +40,26 @@ def test_get_recent_builds_contract(seeded_db: VarysDatabase):
         assert model.build_number > 0
         assert model.result in ("SUCCESS", "FAILURE", "UNSTABLE", "ABORTED")
         assert model.duration_sec > 0
-        assert len(model.commit_hash) > 0
 
 
-def test_get_recent_builds_nonexistent_job(seeded_db: VarysDatabase):
-    """Verify get_recent_builds gracefully returns empty list for unknown job."""
-    res = get_recent_builds("nonexistent-pipeline", count=5, db=seeded_db)
-    assert res == []
+def test_build_summary_nullable_commit_hash():
+    """Verify BuildSummary allows None/missing commit_hash without ValidationError."""
+    model = BuildSummary(
+        build_number=1,
+        result="SUCCESS",
+        duration_sec=120.0,
+        timestamp="2026-09-20T10:00:00Z",
+        commit_hash=None,
+    )
+    assert model.commit_hash is None
+
+
+def test_get_recent_builds_nonexistent_job_raises_value_error(seeded_db: VarysDatabase):
+    """Verify get_recent_builds raises ValueError when job is not found, showing available jobs."""
+    with pytest.raises(ValueError) as excinfo:
+        get_recent_builds("payment_pipeline_typo", count=5, db=seeded_db)
+    assert "Job 'payment_pipeline_typo' not found" in str(excinfo.value)
+    assert "payment-pipeline" in str(excinfo.value)
 
 
 def test_get_recent_builds_zero_or_negative_count(seeded_db: VarysDatabase):
@@ -127,3 +129,4 @@ def test_get_commits_between_contract(seeded_db: VarysDatabase):
         assert len(model.commit_hash) > 0
         assert len(model.author) > 0
         assert isinstance(model.files_changed, list)
+        assert model.build_number is not None

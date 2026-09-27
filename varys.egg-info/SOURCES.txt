@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+tests/test_mcp_tools.py
+tests/test_scenarios.py
+varys/__init__.py
+varys.egg-info/PKG-INFO
+varys.egg-info/SOURCES.txt
+varys.egg-info/dependency_links.txt
+varys.egg-info/entry_points.txt
+varys.egg-info/requires.txt
+varys.egg-info/top_level.txt
+varys/mcp/__init__.py
+varys/mcp/server.py
+varys/mcp/tools.py
+varys/storage/__init__.py
+varys/storage/database.py
+varys/storage/seed.py

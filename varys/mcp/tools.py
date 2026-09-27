@@ -1,17 +1,11 @@
-"""Typed MCP Tool implementations and JSON schemas for Varys."""
+"""Typed MCP Tool implementations and Pydantic contracts for Varys."""
 
 from __future__ import annotations
 
 from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
-try:
-    from ..storage.database import VarysDatabase, get_db
-except (ImportError, ValueError):
-    try:
-        from varys.storage.database import VarysDatabase, get_db
-    except (ImportError, ValueError):
-        from database import VarysDatabase, get_db
+from varys.storage.database import VarysDatabase, get_db
 
 
 # --- Pydantic Data Contracts ---
@@ -21,7 +15,7 @@ class BuildSummary(BaseModel):
     result: str = Field(..., description="Build outcome: SUCCESS, FAILURE, UNSTABLE, or ABORTED")
     duration_sec: float = Field(..., description="Total pipeline execution duration in seconds")
     timestamp: str = Field(..., description="ISO 8601 timestamp of build start")
-    commit_hash: str = Field(..., description="Git commit hash associated with this build")
+    commit_hash: Optional[str] = Field(None, description="Git commit hash associated with this build")
 
 
 class TestResultItem(BaseModel):
@@ -109,91 +103,3 @@ def get_commits_between(
         job_name=job_name, start_build=start_build, end_build=end_build
     )
     return [CommitItem(**r).model_dump() for r in raw]
-
-
-# --- Standard Tool JSON Schemas for Agent Calling ---
-
-TOOL_DEFINITIONS = [
-    {
-        "name": "get_recent_builds",
-        "description": "Retrieves summary metadata (build number, status result, duration in seconds, timestamp, and commit hash) of the most recent N builds for a Jenkins pipeline.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "job_name": {
-                    "type": "string",
-                    "description": "Name of the Jenkins pipeline or job (e.g. 'payment-pipeline' or 'order-service-build')",
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of recent builds to retrieve (default: 15)",
-                    "default": 15,
-                },
-            },
-            "required": ["job_name"],
-        },
-    },
-    {
-        "name": "get_test_results",
-        "description": "Returns execution status, duration, error messages, and stack traces for all test cases executed in a specific build number.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "job_name": {
-                    "type": "string",
-                    "description": "Name of the Jenkins pipeline",
-                },
-                "build_number": {
-                    "type": "integer",
-                    "description": "The specific build number to inspect",
-                },
-            },
-            "required": ["job_name", "build_number"],
-        },
-    },
-    {
-        "name": "get_test_history",
-        "description": "Traces the chronological pass/fail history of a single test across previous builds. Essential for detecting flakiness vs permanent breakage.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "job_name": {
-                    "type": "string",
-                    "description": "Name of the Jenkins pipeline",
-                },
-                "test_name": {
-                    "type": "string",
-                    "description": "Simple or fully qualified name of the test class/method (e.g. 'DatabaseConnectionTest')",
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of previous builds to look back (default: 15)",
-                    "default": 15,
-                },
-            },
-            "required": ["job_name", "test_name"],
-        },
-    },
-    {
-        "name": "get_commits_between",
-        "description": "Fetches git commits landed between two build numbers, including author, commit message, and changed file paths. Use this to correlate regressions with code changes.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "job_name": {
-                    "type": "string",
-                    "description": "Name of the Jenkins pipeline",
-                },
-                "start_build": {
-                    "type": "integer",
-                    "description": "The baseline healthy build number",
-                },
-                "end_build": {
-                    "type": "integer",
-                    "description": "The first regression/failing build number",
-                },
-            },
-            "required": ["job_name", "start_build", "end_build"],
-        },
-    },
-]

@@ -1,0 +1,144 @@
+Metadata-Version: 2.4
+Name: varys
+Version: 0.1.0
+Summary: Jenkins CI Intelligence Agent
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Requires-Dist: mcp>=1.0.0
+Requires-Dist: typer>=0.9.0
+Requires-Dist: rich>=13.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.20; extra == "dev"
+
+# Varys — Jenkins CI Intelligence Agent
+## Master Implementation Blueprint & Architecture Guide
+
+> **"A spider has many little whisperers."**  
+> Varys is an autonomous, multi-turn AI diagnostic agent that investigates Jenkins CI pipeline failures, flakiness, and performance regressions by reasoning across build history, test execution patterns, and code commit diffs.
+
+---
+
+## 1. Executive Summary
+
+| Attribute | Specification |
+|---|---|
+| **Project Name** | `varys` |
+| **Type** | CLI Diagnostic Tool & Agent Loop |
+| **Primary Interface** | `$ varys "why is the payment-pipeline job unstable?"` |
+| **Reasoning Model** | Autonomous multi-turn ReAct tool loop (max 5 iterations) |
+| **Core Protocol** | Model Context Protocol (MCP) Server |
+| **Target Execution Time** | < 10 seconds per investigation |
+| **Scope Boundary** | **Read & Diagnose Only** (No CI write actions / test quarantines) |
+
+---
+
+## 2. System Architecture
+
+```
+                      ┌────────────────────────────────────────┐
+                      │             User / CLI                 │
+                      │  $ varys "why is payment-pipeline red?"│
+                      └──────────────────┬─────────────────────┘
+                                         │
+                                         ▼
+                      ┌────────────────────────────────────────┐
+                      │         Varys Agent Orchestrator       │
+                      │  - Plan & Goal decomposition           │
+                      │  - Multi-step ReAct Loop (max 5 turns) │
+                      │  - Context window & trace management   │
+                      └──────────────────┬─────────────────────┘
+                                         │ Tool Calling Protocol
+                                         ▼
+                      ┌────────────────────────────────────────┐
+                      │          Varys MCP Tool Server         │
+                      │                                        │
+                      │  [1] get_recent_builds(job, count)     │
+                      │  [2] get_test_results(job, build_num)  │
+                      │  [3] get_test_history(job, test, count)│
+                      │  [4] get_commits_between(b_a, b_b)     │
+                      └──────────────────┬─────────────────────┘
+                                         │
+                     ┌───────────────────┴───────────────────┐
+                     ▼                                       ▼
+        ┌─────────────────────────┐             ┌─────────────────────────┐
+        │   SQLite / JSON Store   │             │   Live Jenkins API      │
+        │  (Seeded Scenario DB)   │             │   (Optional Adapter)    │
+        │ - Scenario A: Flaky+Cfg │             │                         │
+        │ - Scenario B: Slow Regr │             │                         │
+        └─────────────────────────┘             └─────────────────────────┘
+```
+
+---
+
+## 3. Phased Implementation Roadmap
+
+The implementation is broken down into 6 discrete, testable phases:
+
+| Phase | Title | Focus Area | Deliverables | Target Timeline |
+|---|---|---|---|---|
+| **[Phase 1](./phases/01_data_and_scenarios.md)** | **Data & Seed Scenarios** | Deterministic test beds | SQLite schema, JSON fixtures, Seed generator for Scenario A (Flaky+Config) & B (Duration Regression) | Days 1–2 |
+| **[Phase 2](./phases/02_mcp_server_and_tools.md)** | **MCP Server & Tool Contracts** | Data access layer | FastMCP / standard MCP server with 4 core tool endpoints & unit test suite | Days 3–4 |
+| **[Phase 3](./phases/03_agent_loop_orchestration.md)** | **Agent Loop & Reasoning Engine** | Multi-turn ReAct loop | Dynamic tool calling engine, prompt templates, loop safeguards (turn caps, error fallbacks) | Days 5–7 |
+| **[Phase 4](./phases/04_heuristics_and_diagnostics.md)** | **Heuristics & Correlation Layer** | Analytical depth | Flakiness score heuristic, Duration regression detector, Commit attribution mapper | Days 8–10 |
+| **[Phase 5](./phases/05_cli_and_ux.md)** | **CLI & Live Trace UI** | User Experience | Terminal streaming UI, step-by-step investigation trace spinner, formatted diagnosis cards | Days 11–12 |
+| **[Phase 6](./phases/06_verification_and_demo.md)** | **End-to-End Testing & Interview Guide** | Quality & Defense | Automated verification suite, demo scripts, FAQ & interview defense cheatsheet | Days 13–14 |
+
+---
+
+## 4. Directory Structure
+
+```
+varys/
+├── README.md                            # Master Overview (This file)
+├── phases/                              # Detailed Phase Implementation Plans
+│   ├── 01_data_and_scenarios.md
+│   ├── 02_mcp_server_and_tools.md
+│   ├── 03_agent_loop_orchestration.md
+│   ├── 04_heuristics_and_diagnostics.md
+│   ├── 05_cli_and_ux.md
+│   └── 06_verification_and_demo.md
+├── pyproject.toml / requirements.txt    # Project dependencies
+├── varys/
+│   ├── __init__.py
+│   ├── cli.py                           # CLI entrypoint ($ varys "...")
+│   ├── agent/                           # Agent loop & prompt orchestration
+│   │   ├── __init__.py
+│   │   ├── loop.py                      # ReAct orchestrator loop
+│   │   ├── prompts.py                   # System & analysis prompts
+│   │   └── types.py                     # AgentState, StepResult, Diagnosis
+│   ├── mcp/                             # MCP Server and tool definitions
+│   │   ├── __init__.py
+│   │   ├── server.py                    # MCP server definition
+│   │   └── tools.py                     # Tool functions & contracts
+│   ├── heuristics/                      # Analysis & correlation algorithms
+│   │   ├── __init__.py
+│   │   ├── flakiness.py                 # Pass/fail alternation & entropy
+│   │   ├── regressions.py               # Duration trend change-point detection
+│   │   └── commit_correlator.py         # Git file change to test mapping
+│   ├── storage/                         # Database & mock scenario manager
+│   │   ├── __init__.py
+│   │   ├── database.py                  # SQLite DAO
+│   │   └── seed.py                      # Deterministic scenario generator
+│   └── ui/                              # Rich terminal UI components
+│       ├── __init__.py
+│       ├── console.py                   # Live spinner, step logger
+│       └── renderer.py                  # Diagnosis card & diff renderer
+└── tests/                               # Comprehensive test suite
+    ├── test_scenarios.py
+    ├── test_mcp_tools.py
+    ├── test_agent_loop.py
+    └── test_heuristics.py
+```
+
+---
+
+## 5. Technology Stack Selection
+
+- **Runtime & Language**: Python 3.11+
+- **Agent Tool Protocol**: Model Context Protocol (MCP) via `mcp` / `FastMCP`
+- **LLM Client**: `google-genai` / `anthropic` / `openai` / `litellm` (abstracted driver)
+- **Local Storage**: `sqlite3` + `pydantic` (zero-overhead, deterministic, file-backed)
+- **CLI & Formatting**: `typer` + `rich` (vibrant live spinners, syntax-highlighted diffs, clean tables)
+- **Testing**: `pytest` + `pytest-asyncio`

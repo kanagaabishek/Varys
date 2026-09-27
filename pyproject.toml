@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "varys"
+version = "0.1.0"
+description = "Jenkins CI Intelligence Agent"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "mcp>=1.0.0",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.20",
+]
+
+[tool.setuptools.packages.find]
+include = ["varys*"]
+
+[project.scripts]
+varys = "varys.cli:main"
