@@ -10,9 +10,28 @@ from typing import Any, Callable, Dict, List, Optional
 from google import genai
 from google.genai import types
 
+from pathlib import Path
 from varys.agent.prompts import SYSTEM_PROMPT
 from varys.agent.types import AgentStep, Diagnosis
 from varys.mcp.client import DiscoveredTool, VarysMCPClient
+
+
+def _load_env_fallback() -> None:
+    for env_path in [Path(".env"), Path("varys/.env"), Path(__file__).resolve().parent.parent.parent / ".env"]:
+        if env_path.exists():
+            try:
+                for line in env_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+            except Exception:
+                pass
+
+_load_env_fallback()
 
 
 class VarysAgent:
